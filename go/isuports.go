@@ -1281,7 +1281,7 @@ func playerHandler(c echo.Context) error {
 			(
 				SELECT
 					competition_id,
-					MAX(rows) as max_num_row
+					MAX(num_rows) as max_num_rows
 				FROM
 					player_score
 				GROUP BY
