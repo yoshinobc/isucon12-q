@@ -20,6 +20,7 @@ import (
 
 	_ "net/http/pprof"
 
+	"github.com/carlescere/scheduler"
 	"github.com/go-sql-driver/mysql"
 	"github.com/gofrs/flock"
 	"github.com/jmoiron/sqlx"
@@ -139,6 +140,10 @@ func Run() {
 	e.Debug = true
 	e.Logger.SetLevel(log.DEBUG)
 
+	mmmm = make(map[int64][]PlayerScoreRow)
+
+	go interval()
+
 	var (
 		sqlLogger io.Closer
 		err       error
@@ -200,14 +205,14 @@ func Run() {
 		}
 	}
 	adminDB.SetMaxOpenConns(maxConnsInt)
-	adminDB.SetMaxIdleConns(maxConnsInt*2)
+	adminDB.SetMaxIdleConns(maxConnsInt * 2)
 	// db.SetConnMaxLifetime(time.Minute * 2)
 	adminDB.SetConnMaxIdleTime(time.Minute * 2)
 	for {
 		err := adminDB.Ping()
 		// _, err := db.Exec("SELECT 42")
 		if err == nil {
-						break
+			break
 		}
 		e.Logger.Info(err)
 		time.Sleep(time.Second * 2)
@@ -850,27 +855,27 @@ func playersAddHandler(c echo.Context) error {
 			return fmt.Errorf("error retrievePlayer: %w", err)
 		}
 
-		playerRow := PlayerRow{ID:id, TenantID:v.tenantID, DisplayName:displayName, IsDisqualified:false, CreatedAt:now, UpdatedAt:now}
+		playerRow := PlayerRow{ID: id, TenantID: v.tenantID, DisplayName: displayName, IsDisqualified: false, CreatedAt: now, UpdatedAt: now}
 		playerRowList = append(playerRowList, &playerRow)
 		pds = append(pds, PlayerDetail{
 			//ID:             p.ID,
 			//DisplayName:    p.DisplayName,
 			//IsDisqualified: p.IsDisqualified,
-			ID: id,
-			DisplayName:  displayName,
+			ID:             id,
+			DisplayName:    displayName,
 			IsDisqualified: false,
 		})
 	}
 
 	if _, err := tenantDB.NamedExecContext(
-			ctx,
-			"INSERT INTO player (id, tenant_id, display_name, is_disqualified, created_at, updated_at) VALUES (:id, :tenant_id, :display_name, :is_disqualified, :created_at, :updated_at)",
-			playerRowList,
-		); err != nil {
-			return fmt.Errorf(
-				"error Insert player at tenantDB:  %w", err,
-			)
-		}
+		ctx,
+		"INSERT INTO player (id, tenant_id, display_name, is_disqualified, created_at, updated_at) VALUES (:id, :tenant_id, :display_name, :is_disqualified, :created_at, :updated_at)",
+		playerRowList,
+	); err != nil {
+		return fmt.Errorf(
+			"error Insert player at tenantDB:  %w", err,
+		)
+	}
 
 	res := PlayersAddHandlerResult{
 		Players: pds,
@@ -1037,6 +1042,34 @@ type ScoreHandlerResult struct {
 	Rows int64 `json:"rows"`
 }
 
+var mmmm map[int64][]PlayerScoreRow
+
+func interval() {
+	scheduler.Every(1000).Seconds().NotImmediately().Run(func() {
+		for tenantID, playerScoreRows := range mmmm {
+			tenantDB, err := connectToTenantDB(tenantID)
+
+			if err != nil {
+				log.Error(err)
+			}
+
+			if _, err := tenantDB.NamedExec(
+				"INSERT INTO player_score (id, tenant_id, player_id, competition_id, score, row_num, created_at, updated_at) VALUES (:id, :tenant_id, :player_id, :competition_id, :score, :row_num, :created_at, :updated_at)",
+				playerScoreRows,
+			); err != nil {
+				fmt.Errorf(
+					"error Insert player_score:, %w", err,
+				)
+			}
+
+			mmmm[tenantID] = nil
+
+			// defer tenantDB.Close()
+			tenantDB.Close()
+		}
+	})
+}
+
 // テナント管理者向けAPI
 // POST /api/organizer/competition/:competition_id/score
 // 大会のスコアをCSVでアップロードする
@@ -1049,12 +1082,6 @@ func competitionScoreHandler(c echo.Context) error {
 	if v.role != RoleOrganizer {
 		return echo.NewHTTPError(http.StatusForbidden, "role organizer required")
 	}
-
-	tenantDB, err := connectToTenantDB(v.tenantID)
-	if err != nil {
-		return err
-	}
-	defer tenantDB.Close()
 
 	competitionID := c.Param("competition_id")
 	if competitionID == "" {
@@ -1118,7 +1145,7 @@ func competitionScoreHandler(c echo.Context) error {
 	}
 
 	idFoundDict := make(map[string]bool)
-	for _ , id := range IDs {
+	for _, id := range IDs {
 		idFoundDict[id] = true
 	}
 
@@ -1136,11 +1163,11 @@ func competitionScoreHandler(c echo.Context) error {
 		}
 		playerID, scoreStr := row[0], row[1]
 		_, found := idFoundDict[playerID]
-		if (!found) {
+		if !found {
 			return echo.NewHTTPError(
-		 			http.StatusBadRequest,
-		 			fmt.Sprintf("player not found: %s", playerID),
-		 		)
+				http.StatusBadRequest,
+				fmt.Sprintf("player not found: %s", playerID),
+			)
 		}
 		// if _, err := retrievePlayer(ctx, tenantDB, playerID); err != nil { "SELECT * FROM player WHERE id = ?"
 		// 	// 存在しない参加者が含まれている
@@ -1186,16 +1213,13 @@ func competitionScoreHandler(c echo.Context) error {
 		return fmt.Errorf("error Delete player_score: tenantID=%d, competitionID=%s, %w", v.tenantID, competitionID, err)
 	}
 
+	val, ok := mmmm[v.tenantID]
 
-	if _, err := tenantDB.NamedExecContext(
-		ctx,
-		"INSERT INTO player_score (id, tenant_id, player_id, competition_id, score, row_num, created_at, updated_at) VALUES (:id, :tenant_id, :player_id, :competition_id, :score, :row_num, :created_at, :updated_at)",
-		playerScoreRows,
-	); err != nil {
-		return fmt.Errorf(
-			"error Insert player_score:, %w",  err,
-			)
-		}
+	if !ok || val == nil {
+		mmmm[v.tenantID] = playerScoreRows
+	} else {
+		mmmm[v.tenantID] = append(val, playerScoreRows...)
+	}
 
 	// for _, ps := range playerScoreRows {
 	// 	if _, err := tenantDB.NamedExecContext(
@@ -1207,7 +1231,7 @@ func competitionScoreHandler(c echo.Context) error {
 	// 			"error Insert player_score: id=%s, tenant_id=%d, playerID=%s, competitionID=%s, score=%d, rowNum=%d, createdAt=%d, updatedAt=%d, %w",
 	// 			ps.ID, ps.TenantID, ps.PlayerID, ps.CompetitionID, ps.Score, ps.RowNum, ps.CreatedAt, ps.UpdatedAt, err,
 	// 		)
-//
+	//
 	// 	}
 	// }
 
@@ -1277,7 +1301,7 @@ type PlayerHandlerResult struct {
 	Scores []PlayerScoreDetail `json:"scores"`
 }
 
-func retrieveCompetitionNoDB(competitionTitleDict map[string]string, competitionID string) (string) {
+func retrieveCompetitionNoDB(competitionTitleDict map[string]string, competitionID string) string {
 	title := competitionTitleDict[competitionID]
 	return title
 }
@@ -1387,7 +1411,6 @@ func playerHandler(c echo.Context) error {
 				playerScoreDict[compeitionID.String] = score.Int64
 			}
 
-
 		}
 	}
 
@@ -1486,8 +1509,8 @@ type CompetitionRankingHandlerResult struct {
 }
 
 type PlayerAndPlayerScore struct {
-	PlayerRow		`json:"player"`
-	PlayerScoreRow	`json:"player_score"`
+	PlayerRow      `json:"player"`
+	PlayerScoreRow `json:"player_score"`
 }
 
 // 参加者向けAPI
