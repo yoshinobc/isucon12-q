@@ -1289,34 +1289,44 @@ func playerHandler(c echo.Context) error {
 
 	// palyer_id，tenant_idのcompetitoin_id 2 scoreの辞書を作成
 	var rows *sqlx.Rows
+	// sqlstr := `
+	// 	SELECT
+	// 		ps2.competition_id,
+	// 		ps2.score,
+	// 		ps2.row_num
+	// 	FROM
+	// 		player_score as ps
+	// 	INNER JOIN
+	// 		(
+	// 			SELECT
+	// 				competition_id,
+	// 				MAX(row_num) as max_row_num
+	// 			FROM
+	// 				player_score
+	// 			GROUP BY
+	// 				competition_id
+	// 		) as ps2
+	// 	ON
+	// 		ps.competition_id = ps2.competition_id
+	// 	WHERE
+	// 		ps.row_num = ps2.max_row_num AND ps.tenant_id = ? AND player_id = ?
+	// `
 	sqlstr := `
 		SELECT
 			ps.competition_id,
 			ps.score,
 			ps.row_num
 		FROM
-			player_score as ps
-		INNER JOIN
-			(
-				SELECT
-					competition_id,
-					MAX(row_num) as max_row_num
-				FROM
-					player_score
-				GROUP BY
-					competition_id
-			) as ps2
-		ON
-			ps.competition_id = ps2.competition_id
+			player_score
 		WHERE
-			ps.row_num = ps2.max_row_num AND ps.tenant_id = ? AND player_id = ?
-
+			tenant_id = ? AND player_id = ?
 	`
 	rows, err = tenantDB.Queryx(sqlstr, v.tenantID, p.ID)
 	if err != nil {
 		return fmt.Errorf("error flockByTenantID: %w", err)
 	}
 	playerScoreDict := make(map[string]int64)
+	playerNumRowsDict := make(map[string]int64)
 	for rows.Next() {
 		compeitionID := sql.NullString{}
 		score := sql.NullInt64{}
@@ -1325,8 +1335,19 @@ func playerHandler(c echo.Context) error {
 		if scanErr != nil {
 			log.Print(scanErr)
 		}
-		if compeitionID.Valid && score.Valid {
-			playerScoreDict[compeitionID.String] = score.Int64
+		if compeitionID.Valid && score.Valid && numRows.Valid {
+			v, found := playerNumRowsDict[compeitionID.String]
+			if found {
+				if v <= numRows.Int64 {
+					playerNumRowsDict[compeitionID.String] = numRows.Int64
+					playerScoreDict[compeitionID.String] = score.Int64
+				}
+			} else {
+				playerNumRowsDict[compeitionID.String] = numRows.Int64
+				playerScoreDict[compeitionID.String] = score.Int64
+			}
+
+
 		}
 	}
 
