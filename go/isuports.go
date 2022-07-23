@@ -575,21 +575,25 @@ func billingReportByCompetitions(ctx context.Context, tenantDB dbOrTx, tenantID 
 	if err := tenantDB.SelectContext(ctx, &comps, sql, params...); err != nil {
 		return []*BillingReport{}, fmt.Errorf("error Select comptitions: %w", err)
 	}
+	compsMap := make(map[string]CompetitionRow)
+	for _, c := range comps {
+		compsMap[c.ID] = c
+	}
+
+	billingMap := map[string]map[string]string{}
 
 	// ランキングにアクセスした参加者のIDを取得する
-	sql, params, err = sqlx.In("SELECT competition_id, player_id, MIN(created_at) AS min_created_at FROM visit_history WHERE tenant_id = ? AND competition_id IN (?) GROUP BY player_id", tenantID, compeitionIDs)
-	vhs := []VisitHistorySummaryRow{}
-	if err := adminDB.SelectContext(ctx, &vhs, sql, params...); err != nil {
-		return nil, fmt.Errorf("error Select visit_history: tenantID=%d, %w", tenantID, err)
-	}
-	billingMap := map[string]map[string]string{}
-	for _, vh := range vhs {
-		for _, comp := range comps {
-			if comp.ID != vh.CompetitionID {
+	for _, compID := range compeitionIDs {
+		vhs := []VisitHistorySummaryRow{}
+		if err := adminDB.SelectContext(ctx, &vhs, "SELECT competition_id, player_id, MIN(created_at) AS min_created_at FROM visit_history WHERE tenant_id = ? AND competition_id = ? GROUP BY player_id", tenantID, compID); err != nil {
+			return nil, fmt.Errorf("error Select visit_history: tenantID=%d, %w", tenantID, err)
+		}
+		for _, vh := range vhs {
+			if compID != vh.CompetitionID {
 				continue
 			}
 			// competition.finished_atよりもあとの場合は、終了後に訪問したとみなして大会開催内アクセス済みとみなさない
-			if comp.FinishedAt.Valid && comp.FinishedAt.Int64 < vh.MinCreatedAt {
+			if compsMap[compID].FinishedAt.Valid && compsMap[compID].FinishedAt.Int64 < vh.MinCreatedAt {
 				continue
 			}
 			billingMap[vh.CompetitionID][vh.PlayerID] = "visitor"
