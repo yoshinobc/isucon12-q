@@ -1266,9 +1266,9 @@ func playerHandler(c echo.Context) error {
 	var rows *sqlx.Rows
 	sqlstr := `
 		SELECT
-			competition_id,
-			score,
-			row_num
+			ps.competition_id,
+			ps.score,
+			ps.row_num
 		FROM
 			player_score as ps
 		INNER JOIN
