@@ -580,7 +580,7 @@ func billingReportByCompetitions(ctx context.Context, tenantDB dbOrTx, tenantID 
 		compsMap[c.ID] = c
 	}
 
-	billingMap := map[string]map[string]string{}
+	billingMap := make(map[string]map[string]string)
 
 	// ランキングにアクセスした参加者のIDを取得する
 	for _, compID := range compeitionIDs {
@@ -595,6 +595,9 @@ func billingReportByCompetitions(ctx context.Context, tenantDB dbOrTx, tenantID 
 			// competition.finished_atよりもあとの場合は、終了後に訪問したとみなして大会開催内アクセス済みとみなさない
 			if compsMap[compID].FinishedAt.Valid && compsMap[compID].FinishedAt.Int64 < vh.MinCreatedAt {
 				continue
+			}
+			if billingMap[compID] == nil {
+				billingMap[compID] = make(map[string]string)
 			}
 			billingMap[compID][vh.PlayerID] = "visitor"
 		}
