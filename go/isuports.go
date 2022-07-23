@@ -401,6 +401,14 @@ func retrievePlayer(ctx context.Context, tenantDB dbOrTx, id string) (*PlayerRow
 	return &p, nil
 }
 
+// 参加者のIDを取得する
+func retrievePlayerID(ctx context.Context, tenantDB dbOrTx) (ids []int64, err error) {
+	if err := tenantDB.SelectContext(ctx, &ids, "SELECT id FROM player"); err != nil {
+		return nil, fmt.Errorf("error Select player: %w", err)
+	}
+	return
+}
+
 // 参加者を認可する
 // 参加者向けAPIで呼ばれる
 func authorizePlayer(ctx context.Context, tenantDB dbOrTx, id string) error {
@@ -1074,6 +1082,18 @@ func competitionScoreHandler(c echo.Context) error {
 		return fmt.Errorf("error flockByTenantID: %w", err)
 	}
 	defer fl.Close()
+
+	ids, err := retrievePlayerID(ctx, tenantDB)
+	if err != nil {
+		return fmt.Errorf("error id list select from tenantDB")
+	}
+	idMap := make(map[string]struct{})
+	for _, id := range ids {
+		strId := strconv.FormatInt(id, 10)
+		idMap[strId] = struct{}{}
+	}
+
+
 	var rowNum int64
 	playerScoreRows := []PlayerScoreRow{}
 	for {
@@ -1089,16 +1109,22 @@ func competitionScoreHandler(c echo.Context) error {
 			return fmt.Errorf("row must have two columns: %#v", row)
 		}
 		playerID, scoreStr := row[0], row[1]
-		if _, err := retrievePlayer(ctx, tenantDB, playerID); err != nil {
-			// 存在しない参加者が含まれている
-			if errors.Is(err, sql.ErrNoRows) {
-				return echo.NewHTTPError(
-					http.StatusBadRequest,
-					fmt.Sprintf("player not found: %s", playerID),
-				)
-			}
-			return fmt.Errorf("error retrievePlayer: %w", err)
+		if _, ok := idMap[playerID]; !ok {
+			return echo.NewHTTPError(
+				http.StatusBadRequest,
+				fmt.Sprintf("player not found: %s", playerID),
+			)
 		}
+		// if _, err := retrievePlayer(ctx, tenantDB, playerID); err != nil {
+		// 	// 存在しない参加者が含まれている
+		// 	if errors.Is(err, sql.ErrNoRows) {
+		// 		return echo.NewHTTPError(
+		// 			http.StatusBadRequest,
+		// 			fmt.Sprintf("player not found: %s", playerID),
+		// 		)
+		// 	}
+		// 	return fmt.Errorf("error retrievePlayer: %w", err)
+		// }
 		var score int64
 		if score, err = strconv.ParseInt(scoreStr, 10, 64); err != nil {
 			return echo.NewHTTPError(
