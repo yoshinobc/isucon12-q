@@ -139,7 +139,7 @@ func SetCacheControlPrivate(next echo.HandlerFunc) echo.HandlerFunc {
 func Run() {
 	e := echo.New()
 	e.Debug = true
-	e.Logger.SetLevel(log.DEBUG)
+	e.Logger.SetLevel(log.OFF)
 
 	playerTenantDisqualifiedDict = make(map[string]SuccessResult)
 
@@ -217,10 +217,6 @@ func Run() {
 		time.Sleep(time.Second * 2)
 	}
 	defer adminDB.Close()
-
-	go func() {
-		e.Logger.Info(http.ListenAndServe("localhost:6060", nil))
-	}()
 
 	port := getEnv("SERVER_APP_PORT", "3000")
 	e.Logger.Infof("starting isuports server on : %s ...", port)
