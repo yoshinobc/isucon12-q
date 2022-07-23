@@ -1108,8 +1108,6 @@ func competitionScoreHandler(c echo.Context) error {
 			return fmt.Errorf("row must have two columns: %#v", row)
 		}
 		playerID, scoreStr := row[0], row[1]
-		_, exists := idMap[playerID]
-		fmt.Printf("playerID req: %s, exists? %t\n", row[0], exists)
 		if _, ok := idMap[playerID]; !ok {
 			return echo.NewHTTPError(
 				http.StatusBadRequest,
