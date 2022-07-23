@@ -1308,7 +1308,7 @@ func playerHandler(c echo.Context) error {
 	var rowsComp *sqlx.Rows
 	sqlstrComp := `
 		SELECT
-			competition_id,
+			id,
 			title
 		FROM
 			competition
