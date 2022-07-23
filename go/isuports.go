@@ -585,7 +585,7 @@ func billingReportByCompetitions(ctx context.Context, tenantDB dbOrTx, tenantID 
 	// ランキングにアクセスした参加者のIDを取得する
 	for _, compID := range compeitionIDs {
 		vhs := []VisitHistorySummaryRow{}
-		if err := adminDB.SelectContext(ctx, &vhs, "SELECT competition_id, player_id, MIN(created_at) AS min_created_at FROM visit_history WHERE tenant_id = ? AND competition_id = ? GROUP BY player_id", tenantID, compID); err != nil {
+		if err := adminDB.SelectContext(ctx, &vhs, "SELECT player_id, MIN(created_at) AS min_created_at FROM visit_history WHERE tenant_id = ? AND competition_id = ? GROUP BY player_id", tenantID, compID); err != nil {
 			return nil, fmt.Errorf("error Select visit_history: tenantID=%d, %w", tenantID, err)
 		}
 		for _, vh := range vhs {
@@ -596,7 +596,7 @@ func billingReportByCompetitions(ctx context.Context, tenantDB dbOrTx, tenantID 
 			if compsMap[compID].FinishedAt.Valid && compsMap[compID].FinishedAt.Int64 < vh.MinCreatedAt {
 				continue
 			}
-			billingMap[vh.CompetitionID][vh.PlayerID] = "visitor"
+			billingMap[compID][vh.PlayerID] = "visitor"
 		}
 	}
 
