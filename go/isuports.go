@@ -818,6 +818,8 @@ func playersAddHandler(c echo.Context) error {
 	displayNames := params["display_name[]"]
 
 	pds := make([]PlayerDetail, 0, len(displayNames))
+
+	var playerRowList []*PlayerRow
 	for _, displayName := range displayNames {
 		id, err := dispenseID(ctx)
 		if err != nil {
@@ -825,26 +827,44 @@ func playersAddHandler(c echo.Context) error {
 		}
 
 		now := time.Now().Unix()
-		if _, err := tenantDB.ExecContext(
-			ctx,
-			"INSERT INTO player (id, tenant_id, display_name, is_disqualified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-			id, v.tenantID, displayName, false, now, now,
-		); err != nil {
-			return fmt.Errorf(
-				"error Insert player at tenantDB: id=%s, displayName=%s, isDisqualified=%t, createdAt=%d, updatedAt=%d, %w",
-				id, displayName, false, now, now, err,
-			)
-		}
-		p, err := retrievePlayer(ctx, tenantDB, id)
+		//if _, err := tenantDB.ExecContext(
+		//	ctx,
+		//	"INSERT INTO player (id, tenant_id, display_name, is_disqualified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+		//	id, v.tenantID, displayName, false, now, now,
+		//); err != nil {
+		//	return fmt.Errorf(
+		//		"error Insert player at tenantDB: id=%s, displayName=%s, isDisqualified=%t, createdAt=%d, updatedAt=%d, %w",
+		//		id, displayName, false, now, now, err,
+		//	)
+		//}
+
+		//p, err := retrievePlayer(ctx, tenantDB, id) // "SELECT * FROM player WHERE id = ?
+
 		if err != nil {
 			return fmt.Errorf("error retrievePlayer: %w", err)
 		}
+
+		playerRow := PlayerRow{ID:id, TenantID:v.tenantID, DisplayName:displayName, IsDisqualified:false, CreatedAt:now, UpdatedAt:now}
+		playerRowList = append(playerRowList, &playerRow)
 		pds = append(pds, PlayerDetail{
-			ID:             p.ID,
-			DisplayName:    p.DisplayName,
-			IsDisqualified: p.IsDisqualified,
+			//ID:             p.ID,
+			//DisplayName:    p.DisplayName,
+			//IsDisqualified: p.IsDisqualified,
+			ID: id,
+			DisplayName:  displayName,
+			IsDisqualified: false,
 		})
 	}
+
+	if _, err := tenantDB.NamedExecContext(
+			ctx,
+			"INSERT INTO player (id, tenant_id, display_name, is_disqualified, created_at, updated_at) VALUES (:id, :tenant_id, :display_name, :is_disqualified, :created_at, :updated_at)",
+			playerRowList,
+		); err != nil {
+			return fmt.Errorf(
+				"error Insert player at tenantDB:  %w", err,
+			)
+		}
 
 	res := PlayersAddHandlerResult{
 		Players: pds,
@@ -1132,19 +1152,31 @@ func competitionScoreHandler(c echo.Context) error {
 	); err != nil {
 		return fmt.Errorf("error Delete player_score: tenantID=%d, competitionID=%s, %w", v.tenantID, competitionID, err)
 	}
-	for _, ps := range playerScoreRows {
-		if _, err := tenantDB.NamedExecContext(
-			ctx,
-			"INSERT INTO player_score (id, tenant_id, player_id, competition_id, score, row_num, created_at, updated_at) VALUES (:id, :tenant_id, :player_id, :competition_id, :score, :row_num, :created_at, :updated_at)",
-			ps,
-		); err != nil {
-			return fmt.Errorf(
-				"error Insert player_score: id=%s, tenant_id=%d, playerID=%s, competitionID=%s, score=%d, rowNum=%d, createdAt=%d, updatedAt=%d, %w",
-				ps.ID, ps.TenantID, ps.PlayerID, ps.CompetitionID, ps.Score, ps.RowNum, ps.CreatedAt, ps.UpdatedAt, err,
-			)
 
+
+	if _, err := tenantDB.NamedExecContext(
+		ctx,
+		"INSERT INTO player_score (id, tenant_id, player_id, competition_id, score, row_num, created_at, updated_at) VALUES (:id, :tenant_id, :player_id, :competition_id, :score, :row_num, :created_at, :updated_at)",
+		playerScoreRows,
+	); err != nil {
+		return fmt.Errorf(
+			"error Insert player_score:, %w",  err,
+			)
 		}
-	}
+
+	// for _, ps := range playerScoreRows {
+	// 	if _, err := tenantDB.NamedExecContext(
+	// 		ctx,
+	// 		"INSERT INTO player_score (id, tenant_id, player_id, competition_id, score, row_num, created_at, updated_at) VALUES (:id, :tenant_id, :player_id, :competition_id, :score, :row_num, :created_at, :updated_at)",
+	// 		ps,
+	// 	); err != nil {
+	// 		return fmt.Errorf(
+	// 			"error Insert player_score: id=%s, tenant_id=%d, playerID=%s, competitionID=%s, score=%d, rowNum=%d, createdAt=%d, updatedAt=%d, %w",
+	// 			ps.ID, ps.TenantID, ps.PlayerID, ps.CompetitionID, ps.Score, ps.RowNum, ps.CreatedAt, ps.UpdatedAt, err,
+	// 		)
+//
+	// 	}
+	// }
 
 	return c.JSON(http.StatusOK, SuccessResult{
 		Status: true,
@@ -1212,6 +1244,11 @@ type PlayerHandlerResult struct {
 	Scores []PlayerScoreDetail `json:"scores"`
 }
 
+func retrieveCompetitionNoDB(competitionTitleDict map[string]string, competitionID string) (string) {
+	title := competitionTitleDict[competitionID]
+	return title
+}
+
 // 参加者向けAPI
 // GET /api/player/player/:player_id
 // 参加者の詳細情報を取得する
@@ -1257,6 +1294,95 @@ func playerHandler(c echo.Context) error {
 		return fmt.Errorf("error Select competition: %w", err)
 	}
 
+	// palyer_id，tenant_idのcompetitoin_id 2 scoreの辞書を作成
+	var rows *sqlx.Rows
+	// sqlstr := `
+	// 	SELECT
+	// 		ps2.competition_id,
+	// 		ps2.score,
+	// 		ps2.row_num
+	// 	FROM
+	// 		player_score as ps
+	// 	INNER JOIN
+	// 		(
+	// 			SELECT
+	// 				competition_id,
+	// 				MAX(row_num) as max_row_num
+	// 			FROM
+	// 				player_score
+	// 			GROUP BY
+	// 				competition_id
+	// 		) as ps2
+	// 	ON
+	// 		ps.competition_id = ps2.competition_id
+	// 	WHERE
+	// 		ps.row_num = ps2.max_row_num AND ps.tenant_id = ? AND player_id = ?
+	// `
+	sqlstr := `
+		SELECT
+			competition_id,
+			score,
+			row_num
+		FROM
+			player_score
+		WHERE
+			tenant_id = ? AND player_id = ?
+	`
+	rows, err = tenantDB.Queryx(sqlstr, v.tenantID, p.ID)
+	if err != nil {
+		return fmt.Errorf("error flockByTenantID: %w", err)
+	}
+	playerScoreDict := make(map[string]int64)
+	playerNumRowsDict := make(map[string]int64)
+	for rows.Next() {
+		compeitionID := sql.NullString{}
+		score := sql.NullInt64{}
+		numRows := sql.NullInt64{}
+		scanErr := rows.Scan(&compeitionID, &score, &numRows)
+		if scanErr != nil {
+			log.Print(scanErr)
+		}
+		if compeitionID.Valid && score.Valid && numRows.Valid {
+			v, found := playerNumRowsDict[compeitionID.String]
+			if found {
+				if v <= numRows.Int64 {
+					playerNumRowsDict[compeitionID.String] = numRows.Int64
+					playerScoreDict[compeitionID.String] = score.Int64
+				}
+			} else {
+				playerNumRowsDict[compeitionID.String] = numRows.Int64
+				playerScoreDict[compeitionID.String] = score.Int64
+			}
+
+
+		}
+	}
+
+	var rowsComp *sqlx.Rows
+	sqlstrComp := `
+		SELECT
+			id,
+			title
+		FROM
+			competition
+	`
+	rowsComp, err = tenantDB.Queryx(sqlstrComp)
+	if err != nil {
+		return fmt.Errorf("error flockByTenantID: %w", err)
+	}
+	competitionTitleDict := make(map[string]string)
+	for rowsComp.Next() {
+		title := sql.NullString{}
+		competitionID := sql.NullString{}
+		scanErr := rowsComp.Scan(&competitionID, &title)
+		if scanErr != nil {
+			log.Print(scanErr)
+		}
+		if title.Valid {
+			competitionTitleDict[competitionID.String] = title.String
+		}
+	}
+
 	// player_scoreを読んでいるときに更新が走ると不整合が起こるのでロックを取得する
 	fl, err := flockByTenantID(v.tenantID)
 	if err != nil {
@@ -1266,32 +1392,35 @@ func playerHandler(c echo.Context) error {
 	pss := make([]PlayerScoreRow, 0, len(cs))
 	for _, c := range cs {
 		ps := PlayerScoreRow{}
-		if err := tenantDB.GetContext(
-			ctx,
-			&ps,
-			// 最後にCSVに登場したスコアを採用する = row_numが一番大きいもの
-			"SELECT * FROM player_score WHERE tenant_id = ? AND competition_id = ? AND player_id = ? ORDER BY row_num DESC LIMIT 1",
-			v.tenantID,
-			c.ID,
-			p.ID,
-		); err != nil {
-			// 行がない = スコアが記録されてない
-			if errors.Is(err, sql.ErrNoRows) {
-				continue
-			}
-			return fmt.Errorf("error Select player_score: tenantID=%d, competitionID=%s, playerID=%s, %w", v.tenantID, c.ID, p.ID, err)
-		}
+		// if err := tenantDB.GetContext(
+		// 	ctx,
+		// 	&ps,
+		// 	// 最後にCSVに登場したスコアを採用する = row_numが一番大きいもの
+		// 	"SELECT * FROM player_score WHERE tenant_id = ? AND competition_id = ? AND player_id = ? ORDER BY row_num DESC LIMIT 1",
+		// 	v.tenantID,
+		// 	c.ID,
+		// 	p.ID,
+		// ); err != nil {
+		// 	// 行がない = スコアが記録されてない
+		// 	if errors.Is(err, sql.ErrNoRows) {
+		// 		continue
+		// 	}
+		// 	return fmt.Errorf("error Select player_score: tenantID=%d, competitionID=%s, playerID=%s, %w", v.tenantID, c.ID, p.ID, err)
+		// }
+		ps.CompetitionID = c.ID
+		ps.Score = playerScoreDict[c.ID]
 		pss = append(pss, ps)
 	}
 
 	psds := make([]PlayerScoreDetail, 0, len(pss))
 	for _, ps := range pss {
-		comp, err := retrieveCompetition(ctx, tenantDB, ps.CompetitionID)
+		//comp, err := retrieveCompetition(ctx, tenantDB, ps.CompetitionID) "SELECT * FROM competition WHERE id = ?"
+		title := retrieveCompetitionNoDB(competitionTitleDict, ps.CompetitionID)
 		if err != nil {
 			return fmt.Errorf("error retrieveCompetition: %w", err)
 		}
 		psds = append(psds, PlayerScoreDetail{
-			CompetitionTitle: comp.Title,
+			CompetitionTitle: title,
 			Score:            ps.Score,
 		})
 	}
@@ -1321,6 +1450,11 @@ type CompetitionRank struct {
 type CompetitionRankingHandlerResult struct {
 	Competition CompetitionDetail `json:"competition"`
 	Ranks       []CompetitionRank `json:"ranks"`
+}
+
+type PlayerAndPlayerScore struct {
+	PlayerRow		`json:"player"`
+	PlayerScoreRow	`json:"player_score"`
 }
 
 // 参加者向けAPI
@@ -1391,11 +1525,19 @@ func competitionRankingHandler(c echo.Context) error {
 		return fmt.Errorf("error flockByTenantID: %w", err)
 	}
 	defer fl.Close()
-	pss := []PlayerScoreRow{}
+	pss := []PlayerAndPlayerScore{}
 	if err := tenantDB.SelectContext(
 		ctx,
 		&pss,
-		"SELECT * FROM player_score WHERE tenant_id = ? AND competition_id = ? ORDER BY row_num DESC",
+		`SELECT player_score.*, player.*
+		FROM
+			player_score
+			INNER JOIN player
+			ON player_score.player_id = player.id
+		WHERE
+			player_score.tenant_id = ?
+			AND player_score.competition_id = ?
+		ORDER BY row_num DESC`,
 		tenant.ID,
 		competitionID,
 	); err != nil {
@@ -1410,7 +1552,7 @@ func competitionRankingHandler(c echo.Context) error {
 			continue
 		}
 		scoredPlayerSet[ps.PlayerID] = struct{}{}
-		p, err := retrievePlayer(ctx, tenantDB, ps.PlayerID)
+		p := ps.PlayerRow
 		if err != nil {
 			return fmt.Errorf("error retrievePlayer: %w", err)
 		}
