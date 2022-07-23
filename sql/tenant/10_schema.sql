@@ -31,10 +31,10 @@ CREATE TABLE player_score (
   updated_at BIGINT NOT NULL
 );
 
--- CREATE INDEX idx_id_competition ON competition(id);
--- CREATE INDEX idx_tenant_id_created_at_competition ON competition(tenant_id, created_at DESC);
--- CREATE INDEX idx_id_player ON player(id);
--- CREATE INDEX idx_tenant_id_created_at_player ON player(tenant_id, created_at DESC);
--- CREATE INDEX idx_tenant_id_competition_id ON player_score(tenant_id, competition_id);
--- CREATE INDEX idx_tenant_id_row_num ON player_score(tenant_id, row_num DESC);
--- CREATE INDEX idx_competition_id_row_num ON player_score(competition_id, row_num DESC);
+CREATE INDEX idx_id_competition ON competition(id);
+CREATE INDEX idx_tenant_id_created_at_competition ON competition(tenant_id, created_at DESC);
+CREATE INDEX idx_id_player ON player(id);
+CREATE INDEX idx_tenant_id_created_at_player ON player(tenant_id, created_at DESC);
+CREATE INDEX idx_tenant_id_competition_id ON player_score(tenant_id, competition_id);
+CREATE INDEX idx_tenant_id_row_num ON player_score(tenant_id, row_num DESC);
+CREATE INDEX idx_competition_id_row_num ON player_score(competition_id, row_num DESC);
