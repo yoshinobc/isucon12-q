@@ -1534,11 +1534,6 @@ func competitionRankingHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "competition_id is required")
 	}
 
-	result, foundResult := finishedCompetitionResult[competitionID]
-	if foundResult {
-		return c.JSON(http.StatusOK, result)
-	}
-
 	// 大会の存在確認
 	competition, err := retrieveCompetition(ctx, tenantDB, competitionID)
 	if err != nil {
@@ -1563,6 +1558,11 @@ func competitionRankingHandler(c echo.Context) error {
 			"error Insert visit_history: playerID=%s, tenantID=%d, competitionID=%s, createdAt=%d, updatedAt=%d, %w",
 			v.playerID, tenant.ID, competitionID, now, now, err,
 		)
+	}
+
+	result, foundResult := finishedCompetitionResult[competitionID]
+	if foundResult {
+		return c.JSON(http.StatusOK, result)
 	}
 
 
