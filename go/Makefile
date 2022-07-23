@@ -3,3 +3,6 @@ isuports: test go.mod go.sum *.go cmd/isuports/*
 
 test:
 	go test -v ./...
+
+clean:
+	rm isuports
