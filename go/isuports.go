@@ -51,7 +51,8 @@ var (
 	sqliteDriverName = "sqlite3"
 )
 
-var	playerTenantDisqualifiedDict map[string]SuccessResult
+var finishedCompetitionResult  map[string]SuccessResult
+var playerTenantDisqualifiedDict map[string]SuccessResult
 
 // 環境変数を取得する、なければデフォルト値を返す
 func getEnv(key string, defaultValue string) string {
@@ -141,6 +142,7 @@ func Run() {
 	e.Debug = true
 	e.Logger.SetLevel(log.DEBUG)
 
+	finishedCompetitionResult = make(map[string]SuccessResult)
 	playerTenantDisqualifiedDict = make(map[string]SuccessResult)
 
 	var (
@@ -226,6 +228,7 @@ func Run() {
 	e.Logger.Infof("starting isuports server on : %s ...", port)
 	serverPort := fmt.Sprintf(":%s", port)
 	e.Logger.Fatal(e.Start(serverPort))
+
 }
 
 // エラー処理関数
@@ -1557,6 +1560,12 @@ func competitionRankingHandler(c echo.Context) error {
 		)
 	}
 
+	result, foundResult := finishedCompetitionResult[competitionID]
+	if foundResult {
+		return c.JSON(http.StatusOK, result)
+	}
+
+
 	var rankAfter int64
 	rankAfterStr := c.QueryParam("rank_after")
 	if rankAfterStr != "" {
@@ -1642,6 +1651,10 @@ func competitionRankingHandler(c echo.Context) error {
 			Ranks: pagedRanks,
 		},
 	}
+	if competition.FinishedAt.Valid {
+		finishedCompetitionResult[competition.ID] = res
+	}
+
 	return c.JSON(http.StatusOK, res)
 }
 
