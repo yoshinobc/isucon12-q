@@ -1304,8 +1304,8 @@ func playerHandler(c echo.Context) error {
 				AND player_score.row_num = player_score_tmp.max_row_num
 		WHERE tenant_id = ? 
 		ORDER BY row_num DESC LIMIT 1`,
-		v.tenantID,
 		p.ID,
+		v.tenantID,
 	); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("error Select competition: %w", err)
 	}
