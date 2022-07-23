@@ -1296,14 +1296,13 @@ func playerHandler(c echo.Context) error {
 				SELECT 
 					competition_id, MAX(row_num) as max_row_num 
 				FROM player_score 
+				WHERE player_id = ? 
 				GROUP BY competition_id
 			) AS player_score_tmp
 			ON 
 				player_score.competition_id = player_score_tmp.competition_id 
 				AND player_score.row_num = player_score_tmp.max_row_num
-		WHERE
-			tenant_id = ? 
-			AND player_id = ? 
+		WHERE tenant_id = ? 
 		ORDER BY row_num DESC LIMIT 1`,
 		v.tenantID,
 		p.ID,
