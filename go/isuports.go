@@ -807,12 +807,14 @@ func tenantsBillingHandler(c echo.Context) error {
 			for _, c := range cs {
 				compIds = append(compIds, c.ID)
 			}
-			reports, err := billingReportByCompetitions(ctx, tenantDB, t.ID, compIds)
+			if len(compIds) > 0 {
+				reports, err := billingReportByCompetitions(ctx, tenantDB, t.ID, compIds)
 				if err != nil {
 					return fmt.Errorf("failed to billingReportByCompetition: %w", err)
 				}
-			for _, r := range reports {
-				tb.BillingYen += r.BillingYen
+				for _, r := range reports {
+					tb.BillingYen += r.BillingYen
+				}
 			}
 			// for _, comp := range cs {
 			// 	report, err := billingReportByCompetition(ctx, tenantDB, t.ID, comp.ID)
