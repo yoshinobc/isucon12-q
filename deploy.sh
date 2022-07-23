@@ -25,19 +25,19 @@ git fetch origin
 git reset --hard $BRANCH
 git pull origin $BRANCH
 
-echo ":: BUILD APP         ====>"
-cd $APPROOT
-make clean
-make
-cd -
+# echo ":: BUILD APP         ====>"
+# cd $APPROOT
+# make clean
+# make
+# cd -
 
 echo
 echo ":: CLEAR LOGS        ====>"
 sudo truncate -s 0 -c /var/log/nginx/access.log
 sudo bash -c ':>/var/log/mysql/mysql-slow.log'
-if [ "$(pgrep mysql | wc -l)" != "0" ]; then
-	sudo mysqladmin flush-logs
-fi
+# if [ "$(pgrep mysql | wc -l)" != "0" ]; then
+# 	sudo mysqladmin flush-logs
+# fi
 
 echo
 echo ":: COPY CONFIGS      ====>"
