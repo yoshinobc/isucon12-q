@@ -1545,7 +1545,7 @@ func competitionRankingHandler(c echo.Context) error {
 			continue
 		}
 		scoredPlayerSet[ps.PlayerID] = struct{}{}
-		p, err := retrievePlayer(ctx, tenantDB, ps.PlayerID)
+		p := ps.PlayerRow
 		if err != nil {
 			return fmt.Errorf("error retrievePlayer: %w", err)
 		}
