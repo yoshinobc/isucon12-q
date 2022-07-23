@@ -51,6 +51,8 @@ var (
 	sqliteDriverName = "sqlite3"
 )
 
+var	playerTenantDisqualifiedDict map[string]SuccessResult
+
 // 環境変数を取得する、なければデフォルト値を返す
 func getEnv(key string, defaultValue string) string {
 	if val, ok := os.LookupEnv(key); ok {
@@ -138,6 +140,8 @@ func Run() {
 	e := echo.New()
 	e.Debug = true
 	e.Logger.SetLevel(log.DEBUG)
+
+	playerTenantDisqualifiedDict = make(map[string]SuccessResult)
 
 	var (
 		sqlLogger io.Closer
@@ -1317,6 +1321,12 @@ func playerHandler(c echo.Context) error {
 		}
 		return fmt.Errorf("error retrievePlayer: %w", err)
 	}
+
+	result, foundResult := playerTenantDisqualifiedDict[playerID+strconv.FormatInt(v.tenantID, 10)]
+	if (foundResult) {
+		return c.JSON(http.StatusOK, result)
+	}
+
 	cs := []CompetitionRow{}
 	if err := tenantDB.SelectContext(
 		ctx,
@@ -1386,7 +1396,6 @@ func playerHandler(c echo.Context) error {
 				playerNumRowsDict[compeitionID.String] = numRows.Int64
 				playerScoreDict[compeitionID.String] = score.Int64
 			}
-
 
 		}
 	}
@@ -1469,6 +1478,10 @@ func playerHandler(c echo.Context) error {
 			Scores: psds,
 		},
 	}
+	if (p.IsDisqualified) {
+		playerTenantDisqualifiedDict[playerID+strconv.FormatInt(v.tenantID, 10)] = res
+	}
+
 	return c.JSON(http.StatusOK, res)
 }
 
