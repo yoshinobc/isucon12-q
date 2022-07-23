@@ -11,7 +11,12 @@ output: count,2xx,4xx,5xx,method,uri,sum,min,max,avg,p99
 # limit:                      # 5000
 # noheaders:                  # boolean
 # show_footers:               # boolean
-# matching_groups:            # array
+matching_groups: # array
+  - ^/api/player/player/[0-9a-f]+$
+  - ^/api/organizer/player/[0-9a-f]+/disqualified$
+  - ^/api/player/competition/[0-9a-f]+/ranking$
+  - ^/api/organizer/competition/[0-9a-f]+/score$
+  - ^/api/organizer/competition/[0-9a-f]+/finish$
 # filters:                    # string
 # output:                     # string(comma separated)
 # pos_file:                   # string
