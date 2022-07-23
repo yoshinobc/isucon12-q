@@ -8,9 +8,7 @@ CREATE TABLE competition (
   title TEXT NOT NULL,
   finished_at BIGINT NULL,
   created_at BIGINT NOT NULL,
-  updated_at BIGINT NOT NULL,
-  INDEX idx_id (`id`),
-  INDEX idx_tenant_id_created_at (`tenant_id`, `created_at` DESC)
+  updated_at BIGINT NOT NULL
 );
 
 CREATE TABLE player (
@@ -19,9 +17,7 @@ CREATE TABLE player (
   display_name TEXT NOT NULL,
   is_disqualified BOOLEAN NOT NULL,
   created_at BIGINT NOT NULL,
-  updated_at BIGINT NOT NULL,
-  INDEX idx_id (`id`),
-  INDEX idx_tenant_id_created_at (`tenant_id`, `created_at` DESC)
+  updated_at BIGINT NOT NULL
 );
 
 CREATE TABLE player_score (
@@ -32,8 +28,13 @@ CREATE TABLE player_score (
   score BIGINT NOT NULL,
   row_num BIGINT NOT NULL,
   created_at BIGINT NOT NULL,
-  updated_at BIGINT NOT NULL,
-  INDEX idx_tenant_id_competition_id (`tenant_id`, `competition_id`),
-  INDEX idx_tenant_id_row_num (`tenant_id`, `row_num` DESC),
-  INDEX idx_competition_id_row_num (`competition_id`, `row_num` DESC)
+  updated_at BIGINT NOT NULL
 );
+
+CREATE INDEX idx_id ON competition(id)
+CREATE INDEX idx_tenant_id_created_at ON competition(tenant_id, created_at DESC)
+CREATE INDEX idx_id ON player(id)
+CREATE INDEX idx_tenant_id_created_at ON player(tenant_id, created_at DESC)
+CREATE INDEX idx_tenant_id_competition_id ON player_score(tenant_id, competition_id)
+CREATE INDEX idx_tenant_id_row_num ON player_score(tenant_id, row_num DESC)
+CREATE INDEX idx_competition_id_row_num ON player_score(competition_id, row_num DESC)
