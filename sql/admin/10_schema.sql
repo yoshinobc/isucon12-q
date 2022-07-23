@@ -12,7 +12,7 @@ CREATE TABLE `tenant` (
   `updated_at` BIGINT NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`),
-  INDEX idx_id (`id`)
+  INDEX `idx_id` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4;
 
 CREATE TABLE `id_generator` (
@@ -29,6 +29,6 @@ CREATE TABLE `visit_history` (
   `created_at` BIGINT NOT NULL,
   `updated_at` BIGINT NOT NULL,
   INDEX `tenant_id_idx` (`tenant_id`),
-  INDEX idx_tenant_id_player_id (`tenant_id`, `player_id`),
-  INDEX idx_competition_id_player_id (`competition_id`, `player_id`)
+  INDEX `idx_tenant_id_player_id` (`tenant_id`, `player_id`),
+  INDEX `idx_competition_id_player_id` (`competition_id`, `player_id`)
 ) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4;
