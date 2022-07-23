@@ -52,6 +52,7 @@ var (
 )
 
 var finishedCompetitionResult  map[string]SuccessResult
+var playerTenantDisqualifiedDict map[string]SuccessResult
 
 // 環境変数を取得する、なければデフォルト値を返す
 func getEnv(key string, defaultValue string) string {
@@ -142,6 +143,7 @@ func Run() {
 	e.Logger.SetLevel(log.DEBUG)
 
 	finishedCompetitionResult = make(map[string]SuccessResult)
+	playerTenantDisqualifiedDict = make(map[string]SuccessResult)
 
 	var (
 		sqlLogger io.Closer
@@ -689,8 +691,14 @@ func tenantsBillingHandler(c echo.Context) error {
 	//   を合計したものを
 	// テナントの課金とする
 	ts := []TenantRow{}
-	if err := adminDB.SelectContext(ctx, &ts, "SELECT * FROM tenant ORDER BY id DESC"); err != nil {
-		return fmt.Errorf("error Select tenant: %w", err)
+	if beforeID != 0 {
+		if err := adminDB.SelectContext(ctx, &ts, "SELECT * FROM tenant WHERE id < ? ORDER BY id DESC LIMIT 11", beforeID); err != nil {
+			return fmt.Errorf("error Select tenant: %w", err)
+		}
+	} else {
+		if err := adminDB.SelectContext(ctx, &ts, "SELECT * FROM tenant ORDER BY id DESC LIMIT 11"); err != nil {
+			return fmt.Errorf("error Select tenant: %w", err)
+		}
 	}
 	tenantBillings := make([]TenantWithBilling, 0, len(ts))
 	for _, t := range ts {
@@ -1316,6 +1324,12 @@ func playerHandler(c echo.Context) error {
 		}
 		return fmt.Errorf("error retrievePlayer: %w", err)
 	}
+
+	result, foundResult := playerTenantDisqualifiedDict[playerID+strconv.FormatInt(v.tenantID, 10)]
+	if (foundResult) {
+		return c.JSON(http.StatusOK, result)
+	}
+
 	cs := []CompetitionRow{}
 	if err := tenantDB.SelectContext(
 		ctx,
@@ -1385,7 +1399,6 @@ func playerHandler(c echo.Context) error {
 				playerNumRowsDict[compeitionID.String] = numRows.Int64
 				playerScoreDict[compeitionID.String] = score.Int64
 			}
-
 
 		}
 	}
@@ -1468,6 +1481,10 @@ func playerHandler(c echo.Context) error {
 			Scores: psds,
 		},
 	}
+	if (p.IsDisqualified) {
+		playerTenantDisqualifiedDict[playerID+strconv.FormatInt(v.tenantID, 10)] = res
+	}
+
 	return c.JSON(http.StatusOK, res)
 }
 
@@ -1517,6 +1534,11 @@ func competitionRankingHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "competition_id is required")
 	}
 
+	result, foundResult := finishedCompetitionResult[competitionID]
+	if foundResult {
+		return c.JSON(http.StatusOK, result)
+	}
+
 	// 大会の存在確認
 	competition, err := retrieveCompetition(ctx, tenantDB, competitionID)
 	if err != nil {
@@ -1524,11 +1546,6 @@ func competitionRankingHandler(c echo.Context) error {
 			return echo.NewHTTPError(http.StatusNotFound, "competition not found")
 		}
 		return fmt.Errorf("error retrieveCompetition: %w", err)
-	}
-
-	result, foundResult := finishedCompetitionResult[competition.ID]
-	if foundResult {
-		return c.JSON(http.StatusOK, result)
 	}
 
 	now := time.Now().Unix()
