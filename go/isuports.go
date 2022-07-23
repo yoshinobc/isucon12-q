@@ -1274,14 +1274,14 @@ func playerHandler(c echo.Context) error {
 		SELECT
 			competition_id,
 			score,
-			num_rows
+			row_num
 		FROM
 			player_score as ps
 		INNER JOIN
 			(
 				SELECT
 					competition_id,
-					MAX(num_rows) as max_num_rows
+					MAX(row_num) as max_row_num
 				FROM
 					player_score
 				GROUP BY
@@ -1290,7 +1290,7 @@ func playerHandler(c echo.Context) error {
 		ON
 			ps.competition_id = ps2.competition_id
 		WHERE
-			ps.num_rows = ps2.max_num_rows AND ps.tenant_id = ? AND player_id = ?
+			ps.row_num = ps2.max_row_num AND ps.tenant_id = ? AND player_id = ?
 
 	`
 	rows, err = tenantDB.Queryx(sqlstr, v.tenantID, p.ID)
