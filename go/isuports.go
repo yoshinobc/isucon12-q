@@ -819,7 +819,7 @@ func playersAddHandler(c echo.Context) error {
 
 	pds := make([]PlayerDetail, 0, len(displayNames))
 
-	playerRowList := []PlayerRow{}
+	var playerRowList []*PlayerRow
 	for _, displayName := range displayNames {
 		id, err := dispenseID(ctx)
 		if err != nil {
@@ -839,11 +839,12 @@ func playersAddHandler(c echo.Context) error {
 		//}
 		p, err := retrievePlayer(ctx, tenantDB, id) // "SELECT * FROM player WHERE id = ?
 
-		playerRow := PlayerRow{ID:id, TenantID:v.tenantID, DisplayName:displayName, IsDisqualified:false, CreatedAt:now, UpdatedAt:now}
-		playerRowList = append(playerRowList, playerRow)
 		if err != nil {
 			return fmt.Errorf("error retrievePlayer: %w", err)
 		}
+
+		playerRow := PlayerRow{ID:id, TenantID:v.tenantID, DisplayName:displayName, IsDisqualified:false, CreatedAt:now, UpdatedAt:now}
+		playerRowList = append(playerRowList, &playerRow)
 		pds = append(pds, PlayerDetail{
 			ID:             p.ID,
 			DisplayName:    p.DisplayName,
@@ -853,7 +854,7 @@ func playersAddHandler(c echo.Context) error {
 
 	if _, err := tenantDB.NamedExecContext(
 			ctx,
-			"INSERT INTO player (id, tenant_id, display_name, is_disqualified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+			"INSERT INTO player (id, tenant_id, display_name, is_disqualified, created_at, updated_at) VALUES (:id, :tenant_id, :display_name, :is_disqualified, :created_at, :updated_at)",
 			playerRowList,
 		); err != nil {
 			return fmt.Errorf(
