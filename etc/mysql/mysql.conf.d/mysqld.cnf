@@ -77,9 +77,9 @@ max_binlog_size   = 100M
 # binlog_do_db		= include_database_name
 # binlog_ignore_db	= include_database_name
 ##### BEGIN ANSIBLE MANAGED BLOCK #####
-#slow_query_log = 1 
-#slow_query_log_file = '/var/log/mysql/mysql-slow.log'
-#long_query_time = 0
+slow_query_log = 1 
+slow_query_log_file = '/var/log/mysql/mysql-slow.log'
+long_query_time = 0
 # https://www.slideshare.net/kazeburo/mysql-casual7isucon
 max_connections = 10000
 innodb_buffer_pool_size = 1GB
