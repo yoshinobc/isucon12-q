@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	_ "net/http/pprof"
 	"github.com/go-sql-driver/mysql"
 	"github.com/gofrs/flock"
 	"github.com/jmoiron/sqlx"
@@ -189,8 +190,32 @@ func Run() {
 		e.Logger.Fatalf("failed to connect db: %v", err)
 		return
 	}
-	adminDB.SetMaxOpenConns(10)
+	maxConns := os.Getenv("DB_MAXOPENCONNS")
+	maxConnsInt := 25
+	if maxConns != "" {
+		maxConnsInt, err = strconv.Atoi(maxConns)
+		if err != nil {
+			panic(err)
+		}
+	}
+	adminDB.SetMaxOpenConns(maxConnsInt)
+	adminDB.SetMaxIdleConns(maxConnsInt*2)
+	// db.SetConnMaxLifetime(time.Minute * 2)
+	adminDB.SetConnMaxIdleTime(time.Minute * 2)
+	for {
+		err := adminDB.Ping()
+		// _, err := db.Exec("SELECT 42")
+		if err == nil {
+						break
+		}
+		e.Logger.Info(err)
+		time.Sleep(time.Second * 2)
+	}
 	defer adminDB.Close()
+
+	go func() {
+		e.Logger.Info(http.ListenAndServe("localhost:6060", nil))
+	}()
 
 	port := getEnv("SERVER_APP_PORT", "3000")
 	e.Logger.Infof("starting isuports server on : %s ...", port)
