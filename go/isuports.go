@@ -804,6 +804,9 @@ func tenantsBillingHandler(c echo.Context) error {
 				return fmt.Errorf("failed to Select competition: %w", err)
 			}
 			compIds := make([]string, 0, len(cs))
+			for _, c := range cs {
+				compIds = append(compIds, c.ID)
+			}
 			reports, err := billingReportByCompetitions(ctx, tenantDB, t.ID, compIds)
 				if err != nil {
 					return fmt.Errorf("failed to billingReportByCompetition: %w", err)
