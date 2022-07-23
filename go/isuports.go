@@ -223,7 +223,7 @@ func Run() {
 	serverPort := fmt.Sprintf(":%s", port)
 	e.Logger.Fatal(e.Start(serverPort))
 
-	finishedCompetitionResult = make(map[string]SuccessResult)
+	finishedCompetitionResult = map[string]SuccessResult{}
 }
 
 // エラー処理関数
