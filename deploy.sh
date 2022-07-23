@@ -64,7 +64,7 @@ sudo systemctl restart nginx
 sudo systemctl restart mysql
 sudo systemctl restart ${SYSTEMD_SERVICE}
 
-#go tool pprof -seconds 80 -http=0.0.0.0:1080 http://localhost:6060/debug/pprof/profile &
+go tool pprof -seconds 80 -http=0.0.0.0:1080 http://localhost:6060/debug/pprof/profile &
 
 echo
 echo ":: DROP CACHE        ====>"
