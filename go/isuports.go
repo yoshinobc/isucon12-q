@@ -837,7 +837,8 @@ func playersAddHandler(c echo.Context) error {
 		//		id, displayName, false, now, now, err,
 		//	)
 		//}
-		p, err := retrievePlayer(ctx, tenantDB, id) // "SELECT * FROM player WHERE id = ?
+
+		//p, err := retrievePlayer(ctx, tenantDB, id) // "SELECT * FROM player WHERE id = ?
 
 		if err != nil {
 			return fmt.Errorf("error retrievePlayer: %w", err)
@@ -846,9 +847,12 @@ func playersAddHandler(c echo.Context) error {
 		playerRow := PlayerRow{ID:id, TenantID:v.tenantID, DisplayName:displayName, IsDisqualified:false, CreatedAt:now, UpdatedAt:now}
 		playerRowList = append(playerRowList, &playerRow)
 		pds = append(pds, PlayerDetail{
-			ID:             p.ID,
-			DisplayName:    p.DisplayName,
-			IsDisqualified: p.IsDisqualified,
+			//ID:             p.ID,
+			//DisplayName:    p.DisplayName,
+			//IsDisqualified: p.IsDisqualified,
+			ID: id,
+			DisplayName:  displayName,
+			IsDisqualified: false,
 		})
 	}
 
