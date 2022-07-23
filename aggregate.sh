@@ -26,7 +26,7 @@ fi
 
 echo
 echo '`:: ACCESS LOG        ====>`' | notify_slack
-sudo alp ltsv -c /home/isucon/alp.yml > ${LOGDIR}/nginx_access.log.${TIME}
+sudo alp ltsv -c /home/isucon/webapp/alp.yml > ${LOGDIR}/nginx_access.log.${TIME}
 cat <(echo $slack_code_block) ${LOGDIR}/nginx_access.log.${TIME} <(echo $slack_code_block) | notify_slack
 
 echo '`:: SLOW QUERY DIGEST ====>`' | notify_slack
