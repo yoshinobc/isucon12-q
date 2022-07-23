@@ -1432,6 +1432,11 @@ type CompetitionRankingHandlerResult struct {
 	Ranks       []CompetitionRank `json:"ranks"`
 }
 
+type PlayerAndPlayerScore struct {
+	PlayerRow		`json:"player"`
+	PlayerScoreRow	`json:"player_score"`
+}
+
 // 参加者向けAPI
 // GET /api/player/competition/:competition_id/ranking
 // 大会ごとのランキングを取得する
@@ -1500,11 +1505,19 @@ func competitionRankingHandler(c echo.Context) error {
 		return fmt.Errorf("error flockByTenantID: %w", err)
 	}
 	defer fl.Close()
-	pss := []PlayerScoreRow{}
+	pss := []PlayerAndPlayerScore{}
 	if err := tenantDB.SelectContext(
 		ctx,
 		&pss,
-		"SELECT * FROM player_score WHERE tenant_id = ? AND competition_id = ? ORDER BY row_num DESC",
+		`SELECT player_score.*, player.* 
+		FROM 
+			player_score 
+			INNER JOIN player 
+			ON player_score.player_id = player.id 
+		WHERE 
+			player_score.tenant_id = ? 
+			AND player_score.competition_id = ? 
+		ORDER BY row_num DESC`,
 		tenant.ID,
 		competitionID,
 	); err != nil {
@@ -1519,7 +1532,7 @@ func competitionRankingHandler(c echo.Context) error {
 			continue
 		}
 		scoredPlayerSet[ps.PlayerID] = struct{}{}
-		p, err := retrievePlayer(ctx, tenantDB, ps.PlayerID)
+		p := ps.PlayerRow
 		if err != nil {
 			return fmt.Errorf("error retrievePlayer: %w", err)
 		}
