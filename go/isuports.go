@@ -1284,7 +1284,8 @@ func playerHandler(c echo.Context) error {
 		return fmt.Errorf("error retrievePlayer: %w", err)
 	}
 	cs := []CompetitionRow{}
-	tenantDB.GetContext(
+	
+	if err := tenantDB.GetContext(
 		ctx,
 		&cs,
 		`SELECT *
@@ -1306,13 +1307,6 @@ func playerHandler(c echo.Context) error {
 		ORDER BY row_num DESC LIMIT 1`,
 		v.tenantID,
 		p.ID,
-	)
-
-	if err := tenantDB.SelectContext(
-		ctx,
-		&cs,
-		"SELECT * FROM competition WHERE tenant_id = ? ORDER BY created_at ASC",
-		v.tenantID,
 	); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("error Select competition: %w", err)
 	}
