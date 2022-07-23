@@ -693,6 +693,20 @@ func tenantsBillingHandler(c echo.Context) error {
 			return fmt.Errorf("error Select tenant: %w", err)
 		}
 	}
+
+	var tenantDB *sqlx.DB
+	if len(ts) > 0 {
+		tenantDB, err := connectToTenantDB(ts[0].ID)
+		if err != nil {
+			return fmt.Errorf("failed to connectToTenantDB: %w", err)
+		}
+		for _, t := range ts {
+			path := tenantDBPath(t.ID)
+			tenantDB.ExecContext(ctx, fmt.Sprintf("ATTACH DATABASE %s AS %s", path, fmt.Sprintf("db%d", t.ID)))
+		}
+	}
+
+
 	tenantBillings := make([]TenantWithBilling, 0, len(ts))
 	for _, t := range ts {
 		if beforeID != 0 && beforeID <= t.ID {
@@ -713,7 +727,7 @@ func tenantsBillingHandler(c echo.Context) error {
 			if err := tenantDB.SelectContext(
 				ctx,
 				&cs,
-				"SELECT * FROM competition WHERE tenant_id=?",
+				fmt.Sprintf("SELECT * FROM db%d.competition WHERE tenant_id=?", t.ID),
 				t.ID,
 			); err != nil {
 				return fmt.Errorf("failed to Select competition: %w", err)
@@ -735,6 +749,16 @@ func tenantsBillingHandler(c echo.Context) error {
 			break
 		}
 	}
+
+	if len(ts) > 0 {
+		for _, t := range ts {
+			if _, err := tenantDB.ExecContext(ctx, fmt.Sprintf("DETACH DATABASE db%d", t.ID)); err != nil {
+				fmt.Println("failed to detach database on sqlite tenant: %w", err)
+			}
+		}
+		tenantDB.Close()
+	}
+
 	return c.JSON(http.StatusOK, SuccessResult{
 		Status: true,
 		Data: TenantsBillingHandlerResult{
