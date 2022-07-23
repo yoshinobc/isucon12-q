@@ -1237,6 +1237,11 @@ type PlayerHandlerResult struct {
 	Scores []PlayerScoreDetail `json:"scores"`
 }
 
+func retrieveCompetitionNoDB(competitionTitleDict map[string]string, competitionID string) (string) {
+	title := competitionTitleDict[competitionID]
+	return title
+}
+
 // 参加者向けAPI
 // GET /api/player/player/:player_id
 // 参加者の詳細情報を取得する
@@ -1282,6 +1287,7 @@ func playerHandler(c echo.Context) error {
 		return fmt.Errorf("error Select competition: %w", err)
 	}
 
+	// palyer_id，tenant_idのcompetitoin_id 2 scoreの辞書を作成
 	var rows *sqlx.Rows
 	sqlstr := `
 		SELECT
@@ -1310,8 +1316,6 @@ func playerHandler(c echo.Context) error {
 	if err != nil {
 		return fmt.Errorf("error flockByTenantID: %w", err)
 	}
-
-
 	playerScoreDict := make(map[string]int64)
 	for rows.Next() {
 		compeitionID := sql.NullString{}
@@ -1325,7 +1329,31 @@ func playerHandler(c echo.Context) error {
 			playerScoreDict[compeitionID.String] = score.Int64
 		}
 	}
-	log.Print(playerScoreDict)
+
+	var rowsComp *sqlx.Rows
+	sqlstrComp := `
+		SELECT
+			competition_id,
+			title
+		FROM
+			competition
+	`
+	rowsComp, err = tenantDB.Queryx(sqlstrComp)
+	if err != nil {
+		return fmt.Errorf("error flockByTenantID: %w", err)
+	}
+	competitionTitleDict := make(map[string]string)
+	for rowsComp.Next() {
+		title := sql.NullString{}
+		competitionID := sql.NullString{}
+		scanErr := rowsComp.Scan(&competitionID, &title)
+		if scanErr != nil {
+			log.Print(scanErr)
+		}
+		if title.Valid {
+			competitionTitleDict[competitionID.String] = title.String
+		}
+	}
 
 	// player_scoreを読んでいるときに更新が走ると不整合が起こるのでロックを取得する
 	fl, err := flockByTenantID(v.tenantID)
@@ -1358,12 +1386,13 @@ func playerHandler(c echo.Context) error {
 
 	psds := make([]PlayerScoreDetail, 0, len(pss))
 	for _, ps := range pss {
-		comp, err := retrieveCompetition(ctx, tenantDB, ps.CompetitionID)
+		//comp, err := retrieveCompetition(ctx, tenantDB, ps.CompetitionID) "SELECT * FROM competition WHERE id = ?"
+		title := retrieveCompetitionNoDB(competitionTitleDict, ps.CompetitionID)
 		if err != nil {
 			return fmt.Errorf("error retrieveCompetition: %w", err)
 		}
 		psds = append(psds, PlayerScoreDetail{
-			CompetitionTitle: comp.Title,
+			CompetitionTitle: title,
 			Score:            ps.Score,
 		})
 	}
