@@ -1288,7 +1288,7 @@ func playerHandler(c echo.Context) error {
 
 	if err := tenantDB.SelectContext(
 		ctx,
-		&pss2,
+		&pss,
 		`SELECT player_score.*
 		FROM 
 			player_score
