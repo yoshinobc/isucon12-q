@@ -1525,7 +1525,6 @@ func competitionRankingHandler(c echo.Context) error {
 		}
 		return fmt.Errorf("error retrieveCompetition: %w", err)
 	}
-	c.Logger().Info(finishedCompetitionResult)
 
 	result, foundResult := finishedCompetitionResult[competition.ID]
 	if foundResult {
