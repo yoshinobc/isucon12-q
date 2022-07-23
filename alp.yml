@@ -2,7 +2,7 @@
 file: /var/log/nginx/access.log # string
 sort: sum                   # max|min|avg|sum|count|uri|method|max-body|min-body|avg-body|sum-body|p1|p50|p99|stddev
 reverse: yes                # boolean
-output: count,2xx,4xx,5xx,method,uri,sum,min,max,avg,p99
+output: count,2xx,3xx,4xx,5xx,method,uri,sum,min,max,avg,p99
 
 # query_string:               # boolean
 # query_string_ignore_values: # boolean
