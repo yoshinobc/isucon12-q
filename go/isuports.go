@@ -1086,6 +1086,12 @@ func competitionScoreHandler(c echo.Context) error {
 	if v.role != RoleOrganizer {
 		return echo.NewHTTPError(http.StatusForbidden, "role organizer required")
 	}
+	
+	tenantDB, err := connectToTenantDB(v.tenantID)
+	if err != nil {
+		return err
+	}
+	defer tenantDB.Close()
 
 	competitionID := c.Param("competition_id")
 	if competitionID == "" {
