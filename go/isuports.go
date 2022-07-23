@@ -1294,9 +1294,9 @@ func playerHandler(c echo.Context) error {
 	// `
 	sqlstr := `
 		SELECT
-			ps.competition_id,
-			ps.score,
-			ps.row_num
+			competition_id,
+			score,
+			row_num
 		FROM
 			player_score
 		WHERE
