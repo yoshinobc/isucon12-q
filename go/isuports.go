@@ -51,6 +51,8 @@ var (
 	sqliteDriverName = "sqlite3"
 )
 
+var	playerTenantDisqualifiedDict map[string]SuccessResult
+
 // 環境変数を取得する、なければデフォルト値を返す
 func getEnv(key string, defaultValue string) string {
 	if val, ok := os.LookupEnv(key); ok {
@@ -138,6 +140,8 @@ func Run() {
 	e := echo.New()
 	e.Debug = true
 	e.Logger.SetLevel(log.DEBUG)
+
+	playerTenantDisqualifiedDict = make(map[string]SuccessResult)
 
 	var (
 		sqlLogger io.Closer
@@ -684,8 +688,14 @@ func tenantsBillingHandler(c echo.Context) error {
 	//   を合計したものを
 	// テナントの課金とする
 	ts := []TenantRow{}
-	if err := adminDB.SelectContext(ctx, &ts, "SELECT * FROM tenant ORDER BY id DESC"); err != nil {
-		return fmt.Errorf("error Select tenant: %w", err)
+	if beforeID != 0 {
+		if err := adminDB.SelectContext(ctx, &ts, "SELECT * FROM tenant WHERE id < ? ORDER BY id DESC LIMIT 11", beforeID); err != nil {
+			return fmt.Errorf("error Select tenant: %w", err)
+		}
+	} else {
+		if err := adminDB.SelectContext(ctx, &ts, "SELECT * FROM tenant ORDER BY id DESC LIMIT 11"); err != nil {
+			return fmt.Errorf("error Select tenant: %w", err)
+		}
 	}
 	tenantBillings := make([]TenantWithBilling, 0, len(ts))
 	for _, t := range ts {
@@ -1097,6 +1107,25 @@ func competitionScoreHandler(c echo.Context) error {
 	defer fl.Close()
 	var rowNum int64
 	playerScoreRows := []PlayerScoreRow{}
+
+	sqlstr := `
+		SELECT
+			id
+		FROM
+			player
+	`
+	var IDs []string
+
+	err = tenantDB.SelectContext(ctx, &IDs, sqlstr)
+	if err != nil {
+		return fmt.Errorf("error flockByTenantID: %w", err)
+	}
+
+	idFoundDict := make(map[string]bool)
+	for _ , id := range IDs {
+		idFoundDict[id] = true
+	}
+
 	for {
 		rowNum++
 		row, err := r.Read()
@@ -1110,16 +1139,24 @@ func competitionScoreHandler(c echo.Context) error {
 			return fmt.Errorf("row must have two columns: %#v", row)
 		}
 		playerID, scoreStr := row[0], row[1]
-		if _, err := retrievePlayer(ctx, tenantDB, playerID); err != nil {
-			// 存在しない参加者が含まれている
-			if errors.Is(err, sql.ErrNoRows) {
-				return echo.NewHTTPError(
-					http.StatusBadRequest,
-					fmt.Sprintf("player not found: %s", playerID),
-				)
-			}
-			return fmt.Errorf("error retrievePlayer: %w", err)
+		_, found := idFoundDict[playerID]
+		if (!found) {
+			return echo.NewHTTPError(
+		 			http.StatusBadRequest,
+		 			fmt.Sprintf("player not found: %s", playerID),
+		 		)
 		}
+		// if _, err := retrievePlayer(ctx, tenantDB, playerID); err != nil { "SELECT * FROM player WHERE id = ?"
+		// 	// 存在しない参加者が含まれている
+		// 	if errors.Is(err, sql.ErrNoRows) {
+		// 		return echo.NewHTTPError(
+		// 			http.StatusBadRequest,
+		// 			fmt.Sprintf("player not found: %s", playerID),
+		// 		)
+		// 	}
+		// 	return fmt.Errorf("error retrievePlayer: %w", err)
+		// }
+
 		var score int64
 		if score, err = strconv.ParseInt(scoreStr, 10, 64); err != nil {
 			return echo.NewHTTPError(
@@ -1284,6 +1321,12 @@ func playerHandler(c echo.Context) error {
 		}
 		return fmt.Errorf("error retrievePlayer: %w", err)
 	}
+
+	result, foundResult := playerTenantDisqualifiedDict[playerID+strconv.FormatInt(v.tenantID, 10)]
+	if (foundResult) {
+		return c.JSON(http.StatusOK, result)
+	}
+
 	cs := []CompetitionRow{}
 	if err := tenantDB.SelectContext(
 		ctx,
@@ -1353,7 +1396,6 @@ func playerHandler(c echo.Context) error {
 				playerNumRowsDict[compeitionID.String] = numRows.Int64
 				playerScoreDict[compeitionID.String] = score.Int64
 			}
-
 
 		}
 	}
@@ -1436,6 +1478,10 @@ func playerHandler(c echo.Context) error {
 			Scores: psds,
 		},
 	}
+	if (p.IsDisqualified) {
+		playerTenantDisqualifiedDict[playerID+strconv.FormatInt(v.tenantID, 10)] = res
+	}
+
 	return c.JSON(http.StatusOK, res)
 }
 
