@@ -818,6 +818,8 @@ func playersAddHandler(c echo.Context) error {
 	displayNames := params["display_name[]"]
 
 	pds := make([]PlayerDetail, 0, len(displayNames))
+
+	playerRowList := []PlayerRow{}
 	for _, displayName := range displayNames {
 		id, err := dispenseID(ctx)
 		if err != nil {
@@ -825,17 +827,20 @@ func playersAddHandler(c echo.Context) error {
 		}
 
 		now := time.Now().Unix()
-		if _, err := tenantDB.ExecContext(
-			ctx,
-			"INSERT INTO player (id, tenant_id, display_name, is_disqualified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-			id, v.tenantID, displayName, false, now, now,
-		); err != nil {
-			return fmt.Errorf(
-				"error Insert player at tenantDB: id=%s, displayName=%s, isDisqualified=%t, createdAt=%d, updatedAt=%d, %w",
-				id, displayName, false, now, now, err,
-			)
-		}
-		p, err := retrievePlayer(ctx, tenantDB, id)
+		//if _, err := tenantDB.ExecContext(
+		//	ctx,
+		//	"INSERT INTO player (id, tenant_id, display_name, is_disqualified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+		//	id, v.tenantID, displayName, false, now, now,
+		//); err != nil {
+		//	return fmt.Errorf(
+		//		"error Insert player at tenantDB: id=%s, displayName=%s, isDisqualified=%t, createdAt=%d, updatedAt=%d, %w",
+		//		id, displayName, false, now, now, err,
+		//	)
+		//}
+		p, err := retrievePlayer(ctx, tenantDB, id) // "SELECT * FROM player WHERE id = ?
+
+		playerRow := PlayerRow{ID:id, TenantID:v.tenantID, DisplayName:displayName, IsDisqualified:false, CreatedAt:now, UpdatedAt:now}
+		playerRowList = append(playerRowList, playerRow)
 		if err != nil {
 			return fmt.Errorf("error retrievePlayer: %w", err)
 		}
@@ -845,6 +850,16 @@ func playersAddHandler(c echo.Context) error {
 			IsDisqualified: p.IsDisqualified,
 		})
 	}
+
+	if _, err := tenantDB.NamedExecContext(
+			ctx,
+			"INSERT INTO player (id, tenant_id, display_name, is_disqualified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+			playerRowList,
+		); err != nil {
+			return fmt.Errorf(
+				"error Insert player at tenantDB:  %w", err,
+			)
+		}
 
 	res := PlayersAddHandlerResult{
 		Players: pds,
@@ -1509,14 +1524,14 @@ func competitionRankingHandler(c echo.Context) error {
 	if err := tenantDB.SelectContext(
 		ctx,
 		&pss,
-		`SELECT player_score.*, player.* 
-		FROM 
-			player_score 
-			INNER JOIN player 
-			ON player_score.player_id = player.id 
-		WHERE 
-			player_score.tenant_id = ? 
-			AND player_score.competition_id = ? 
+		`SELECT player_score.*, player.*
+		FROM
+			player_score
+			INNER JOIN player
+			ON player_score.player_id = player.id
+		WHERE
+			player_score.tenant_id = ?
+			AND player_score.competition_id = ?
 		ORDER BY row_num DESC`,
 		tenant.ID,
 		competitionID,
