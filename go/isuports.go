@@ -222,6 +222,8 @@ func Run() {
 	e.Logger.Infof("starting isuports server on : %s ...", port)
 	serverPort := fmt.Sprintf(":%s", port)
 	e.Logger.Fatal(e.Start(serverPort))
+
+	finishedCompetitionResult = make(map[string]SuccessResult)
 }
 
 // エラー処理関数
@@ -1484,6 +1486,8 @@ type PlayerAndPlayerScore struct {
 	PlayerScoreRow	`json:"player_score"`
 }
 
+var finishedCompetitionResult  map[string]SuccessResult
+
 // 参加者向けAPI
 // GET /api/player/competition/:competition_id/ranking
 // 大会ごとのランキングを取得する
@@ -1520,6 +1524,10 @@ func competitionRankingHandler(c echo.Context) error {
 		}
 		return fmt.Errorf("error retrieveCompetition: %w", err)
 	}
+	result, foundResult := finishedCompetitionResult[competition.ID]
+	if foundResult {
+		return c.JSON(http.StatusOK, result)
+	}
 
 	now := time.Now().Unix()
 	var tenant TenantRow
@@ -1537,6 +1545,7 @@ func competitionRankingHandler(c echo.Context) error {
 			v.playerID, tenant.ID, competitionID, now, now, err,
 		)
 	}
+
 
 	var rankAfter int64
 	rankAfterStr := c.QueryParam("rank_after")
@@ -1623,6 +1632,10 @@ func competitionRankingHandler(c echo.Context) error {
 			Ranks: pagedRanks,
 		},
 	}
+	if competition.FinishedAt.Valid {
+		finishedCompetitionResult[competition.ID] = res
+	}
+
 	return c.JSON(http.StatusOK, res)
 }
 
