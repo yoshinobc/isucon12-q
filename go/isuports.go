@@ -1295,7 +1295,6 @@ func playerHandler(c echo.Context) error {
 				SELECT 
 					competition_id, MAX(row_num) as max_row_num 
 				FROM player_score 
-				WHERE player_id=? 
 				GROUP BY competition_id
 			) AS player_score_tmp
 			ON 
