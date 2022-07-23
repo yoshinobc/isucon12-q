@@ -402,8 +402,8 @@ func retrievePlayer(ctx context.Context, tenantDB dbOrTx, id string) (*PlayerRow
 }
 
 // 参加者のIDを取得する
-func retrievePlayerID(ctx context.Context, tenantDB dbOrTx) (ids []int64, err error) {
-	if err := tenantDB.SelectContext(ctx, &ids, "SELECT id FROM player"); err != nil {
+func retrievePlayerID(ctx context.Context, tenantDB dbOrTx) (ps []PlayerRow, err error) {
+	if err := tenantDB.SelectContext(ctx, &ps, "SELECT * FROM player"); err != nil {
 		return nil, fmt.Errorf("error Select player: %w", err)
 	}
 	return
@@ -1083,14 +1083,13 @@ func competitionScoreHandler(c echo.Context) error {
 	}
 	defer fl.Close()
 
-	ids, err := retrievePlayerID(ctx, tenantDB)
+	players, err := retrievePlayerID(ctx, tenantDB)
 	if err != nil {
 		return fmt.Errorf("error id list select from tenantDB")
 	}
 	idMap := make(map[string]struct{})
-	for _, id := range ids {
-		strId := strconv.FormatInt(id, 10)
-		idMap[strId] = struct{}{}
+	for _, p := range players {
+		idMap[p.ID] = struct{}{}
 	}
 
 
