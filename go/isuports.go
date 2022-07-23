@@ -1283,10 +1283,9 @@ func playerHandler(c echo.Context) error {
 		}
 		return fmt.Errorf("error retrievePlayer: %w", err)
 	}
-	cs := []CompetitionRow{}
 
-	pss2 := []PlayerScoreRow{}
-	
+	pss := []PlayerScoreRow{}
+
 	if err := tenantDB.SelectContext(
 		ctx,
 		&pss2,
@@ -1318,8 +1317,7 @@ func playerHandler(c echo.Context) error {
 		return fmt.Errorf("error flockByTenantID: %w", err)
 	}
 	defer fl.Close()
-	pss := pss2
-	
+
 	psds := make([]PlayerScoreDetail, 0, len(pss))
 	for _, ps := range pss {
 		comp, err := retrieveCompetition(ctx, tenantDB, ps.CompetitionID)
