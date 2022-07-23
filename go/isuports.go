@@ -1284,10 +1284,12 @@ func playerHandler(c echo.Context) error {
 		return fmt.Errorf("error retrievePlayer: %w", err)
 	}
 	cs := []CompetitionRow{}
+
+	pss2 := []PlayerScoreRow{}
 	
 	if err := tenantDB.GetContext(
 		ctx,
-		&cs,
+		&pss2,
 		`SELECT *
 		FROM 
 			player_score
