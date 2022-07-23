@@ -1290,7 +1290,7 @@ func playerHandler(c echo.Context) error {
 	if err := tenantDB.SelectContext(
 		ctx,
 		&pss2,
-		`SELECT *
+		`SELECT player_score.*
 		FROM 
 			player_score
 			INNER JOIN (
