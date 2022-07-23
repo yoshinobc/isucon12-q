@@ -1287,7 +1287,7 @@ func playerHandler(c echo.Context) error {
 
 	pss2 := []PlayerScoreRow{}
 	
-	if err := tenantDB.GetContext(
+	if err := tenantDB.SelectContext(
 		ctx,
 		&pss2,
 		`SELECT *
