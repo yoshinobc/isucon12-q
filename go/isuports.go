@@ -1104,19 +1104,16 @@ func competitionScoreHandler(c echo.Context) error {
 		FROM
 			player
 	`
-	var rowsPlayer *sqlx.Rows
-	rowsPlayer, err = tenantDB.Queryx(sqlstr)
+	var IDs []string
+
+	err = tenantDB.SelectContext(ctx, &IDs, sqlstr)
 	if err != nil {
 		return fmt.Errorf("error flockByTenantID: %w", err)
 	}
-	idPlayerDict  := make(map[string]bool)
-	for rowsPlayer.Next() {
-		id := sql.NullString{}
-		scanErr:= rowsPlayer.Scan(&id)
-		if scanErr != nil {
-			log.Print(scanErr)
-		}
-		idPlayerDict[id.String] = true
+
+	idFoundDict := make(map[string]bool)
+	for _ , id := range IDs {
+		idFoundDict[id] = true
 	}
 
 	for {
@@ -1132,7 +1129,7 @@ func competitionScoreHandler(c echo.Context) error {
 			return fmt.Errorf("row must have two columns: %#v", row)
 		}
 		playerID, scoreStr := row[0], row[1]
-		_, found := idPlayerDict[playerID]
+		_, found := idFoundDict[playerID]
 		if (!found) {
 			return echo.NewHTTPError(
 		 			http.StatusBadRequest,
