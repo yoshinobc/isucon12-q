@@ -559,8 +559,99 @@ type VisitHistoryRow struct {
 }
 
 type VisitHistorySummaryRow struct {
+	CompetitionID string `db:"competition_id"`
 	PlayerID     string `db:"player_id"`
 	MinCreatedAt int64  `db:"min_created_at"`
+}
+
+// 大会一覧の課金レポート一覧を計算する
+func billingReportByCompetitions(ctx context.Context, tenantDB dbOrTx, tenantID int64, compeitionIDs []string) ([]*BillingReport, error) {
+	sql, params, err := sqlx.In("SELECT * FROM competition WHERE id IN (?)", compeitionIDs)
+	if err != nil {
+		return []*BillingReport{}, fmt.Errorf("error create IN comptitions: %w", err)
+	}
+
+	var comps []CompetitionRow
+	if err := tenantDB.SelectContext(ctx, &comps, sql, params...); err != nil {
+		return []*BillingReport{}, fmt.Errorf("error Select comptitions: %w", err)
+	}
+
+	// ランキングにアクセスした参加者のIDを取得する
+	sql, params, err = sqlx.In("SELECT competition_id, player_id, MIN(created_at) AS min_created_at FROM visit_history WHERE tenant_id = ? AND competition_id IN (?) GROUP BY player_id", tenantID, compeitionIDs)
+	vhs := []VisitHistorySummaryRow{}
+	if err := adminDB.SelectContext(ctx, &vhs, sql, params...); err != nil {
+		return nil, fmt.Errorf("error Select visit_history: tenantID=%d, %w", tenantID, err)
+	}
+	billingMap := map[string]map[string]string{}
+	for _, vh := range vhs {
+		for _, comp := range comps {
+			if comp.ID != vh.CompetitionID {
+				continue
+			}
+			// competition.finished_atよりもあとの場合は、終了後に訪問したとみなして大会開催内アクセス済みとみなさない
+			if comp.FinishedAt.Valid && comp.FinishedAt.Int64 < vh.MinCreatedAt {
+				continue
+			}
+			billingMap[vh.CompetitionID][vh.PlayerID] = "visitor"
+		}
+	}
+
+	// player_scoreを読んでいるときに更新が走ると不整合が起こるのでロックを取得する
+	fl, err := flockByTenantID(tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("error flockByTenantID: %w", err)
+	}
+	defer fl.Close()
+
+	// スコアを登録した参加者のIDを取得する
+	sql, params, err = sqlx.In("SELECT DISTINCT(player_id), competition_id FROM player_score WHERE tenant_id = ? AND competition_id IN(?)", tenantID, compeitionIDs)
+	if err != nil {
+		return []*BillingReport{}, fmt.Errorf("error create IN player_scores: %w", err)
+	}
+
+	type ScoredPlayer struct {
+		PlayerID string `db:"player_id"`
+		CompetitionID string `db:"competition_id"`
+	}
+	scoredPlayerIDs := []ScoredPlayer{}
+	if err := tenantDB.SelectContext(ctx, &scoredPlayerIDs, sql, params...); err != nil {
+		return nil, fmt.Errorf("error Select count player_score: tenantID=%d, %w", tenantID, err)
+	}
+	for _, pid := range scoredPlayerIDs {
+		// スコアが登録されている参加者
+		billingMap[pid.CompetitionID][pid.PlayerID] = "player"
+	}
+
+	var bills []*BillingReport
+	for _, comp := range comps {
+		for compID, players := range billingMap {
+			if comp.ID != compID {
+				continue
+			}
+			// 大会が終了している場合のみ請求金額が確定するので計算する
+			var playerCount, visitorCount int64
+			if comp.FinishedAt.Valid {
+				for _, category := range players {
+					switch category {
+					case "player":
+						playerCount++
+					case "visitor":
+						visitorCount++
+					}
+				}
+			}
+			bills = append(bills, &BillingReport{
+				CompetitionID:     comp.ID,
+				CompetitionTitle:  comp.Title,
+				PlayerCount:       playerCount,
+				VisitorCount:      visitorCount,
+				BillingPlayerYen:  100 * playerCount, // スコアを登録した参加者は100円
+				BillingVisitorYen: 10 * visitorCount, // ランキングを閲覧だけした(スコアを登録していない)参加者は10円
+				BillingYen:        100*playerCount + 10*visitorCount,
+			})
+		}
+	}
+	return bills, nil
 }
 
 // 大会ごとの課金レポートを計算する
