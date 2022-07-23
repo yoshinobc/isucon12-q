@@ -1522,14 +1522,14 @@ func competitionRankingHandler(c echo.Context) error {
 	if err := tenantDB.SelectContext(
 		ctx,
 		&pss,
-		`SELECT player.*, player_score.* 
+		`SELECT player_score.*, player.* 
 		FROM 
 			player_score 
 			INNER JOIN player 
 			ON player_score.player_id = player.id 
 		WHERE 
-			tenant_id = ? 
-			AND competition_id = ? 
+			player_score.tenant_id = ? 
+			AND player_score.competition_id = ? 
 		ORDER BY row_num DESC`,
 		tenant.ID,
 		competitionID,
