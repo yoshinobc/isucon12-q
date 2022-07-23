@@ -200,14 +200,14 @@ func Run() {
 		}
 	}
 	adminDB.SetMaxOpenConns(maxConnsInt)
-	adminDB.SetMaxIdleConns(maxConnsInt*2)
+	adminDB.SetMaxIdleConns(maxConnsInt * 2)
 	// db.SetConnMaxLifetime(time.Minute * 2)
 	adminDB.SetConnMaxIdleTime(time.Minute * 2)
 	for {
 		err := adminDB.Ping()
 		// _, err := db.Exec("SELECT 42")
 		if err == nil {
-						break
+			break
 		}
 		e.Logger.Info(err)
 		time.Sleep(time.Second * 2)
@@ -844,27 +844,27 @@ func playersAddHandler(c echo.Context) error {
 			return fmt.Errorf("error retrievePlayer: %w", err)
 		}
 
-		playerRow := PlayerRow{ID:id, TenantID:v.tenantID, DisplayName:displayName, IsDisqualified:false, CreatedAt:now, UpdatedAt:now}
+		playerRow := PlayerRow{ID: id, TenantID: v.tenantID, DisplayName: displayName, IsDisqualified: false, CreatedAt: now, UpdatedAt: now}
 		playerRowList = append(playerRowList, &playerRow)
 		pds = append(pds, PlayerDetail{
 			//ID:             p.ID,
 			//DisplayName:    p.DisplayName,
 			//IsDisqualified: p.IsDisqualified,
-			ID: id,
-			DisplayName:  displayName,
+			ID:             id,
+			DisplayName:    displayName,
 			IsDisqualified: false,
 		})
 	}
 
 	if _, err := tenantDB.NamedExecContext(
-			ctx,
-			"INSERT INTO player (id, tenant_id, display_name, is_disqualified, created_at, updated_at) VALUES (:id, :tenant_id, :display_name, :is_disqualified, :created_at, :updated_at)",
-			playerRowList,
-		); err != nil {
-			return fmt.Errorf(
-				"error Insert player at tenantDB:  %w", err,
-			)
-		}
+		ctx,
+		"INSERT INTO player (id, tenant_id, display_name, is_disqualified, created_at, updated_at) VALUES (:id, :tenant_id, :display_name, :is_disqualified, :created_at, :updated_at)",
+		playerRowList,
+	); err != nil {
+		return fmt.Errorf(
+			"error Insert player at tenantDB:  %w", err,
+		)
+	}
 
 	res := PlayersAddHandlerResult{
 		Players: pds,
@@ -1153,16 +1153,15 @@ func competitionScoreHandler(c echo.Context) error {
 		return fmt.Errorf("error Delete player_score: tenantID=%d, competitionID=%s, %w", v.tenantID, competitionID, err)
 	}
 
-
 	if _, err := tenantDB.NamedExecContext(
 		ctx,
 		"INSERT INTO player_score (id, tenant_id, player_id, competition_id, score, row_num, created_at, updated_at) VALUES (:id, :tenant_id, :player_id, :competition_id, :score, :row_num, :created_at, :updated_at)",
 		playerScoreRows,
 	); err != nil {
 		return fmt.Errorf(
-			"error Insert player_score:, %w",  err,
-			)
-		}
+			"error Insert player_score:, %w", err,
+		)
+	}
 
 	// for _, ps := range playerScoreRows {
 	// 	if _, err := tenantDB.NamedExecContext(
@@ -1174,7 +1173,7 @@ func competitionScoreHandler(c echo.Context) error {
 	// 			"error Insert player_score: id=%s, tenant_id=%d, playerID=%s, competitionID=%s, score=%d, rowNum=%d, createdAt=%d, updatedAt=%d, %w",
 	// 			ps.ID, ps.TenantID, ps.PlayerID, ps.CompetitionID, ps.Score, ps.RowNum, ps.CreatedAt, ps.UpdatedAt, err,
 	// 		)
-//
+	//
 	// 	}
 	// }
 
@@ -1244,7 +1243,7 @@ type PlayerHandlerResult struct {
 	Scores []PlayerScoreDetail `json:"scores"`
 }
 
-func retrieveCompetitionNoDB(competitionTitleDict map[string]string, competitionID string) (string) {
+func retrieveCompetitionNoDB(competitionTitleDict map[string]string, competitionID string) string {
 	title := competitionTitleDict[competitionID]
 	return title
 }
@@ -1285,6 +1284,30 @@ func playerHandler(c echo.Context) error {
 		return fmt.Errorf("error retrievePlayer: %w", err)
 	}
 	cs := []CompetitionRow{}
+	tenantDB.GetContext(
+		ctx,
+		&cs,
+		`SELECT *
+		FROM 
+			player_score
+			INNER JOIN (
+				SELECT 
+					competition_id, MAX(row_num) as max_row_num 
+				FROM player_score 
+				WHERE player_id=? 
+				GROUP BY competition_id
+			) AS player_score_tmp
+			ON 
+				player_score.competition_id = player_score_tmp.competition_id 
+				AND player_score.row_num = player_score_tmp.max_row_num
+		WHERE
+			tenant_id = ? 
+			AND player_id = ? 
+		ORDER BY row_num DESC LIMIT 1`,
+		v.tenantID,
+		p.ID,
+	)
+
 	if err := tenantDB.SelectContext(
 		ctx,
 		&cs,
@@ -1361,8 +1384,8 @@ type CompetitionRankingHandlerResult struct {
 }
 
 type PlayerAndPlayerScore struct {
-	PlayerRow		`json:"player"`
-	PlayerScoreRow	`json:"player_score"`
+	PlayerRow      `json:"player"`
+	PlayerScoreRow `json:"player_score"`
 }
 
 // 参加者向けAPI
