@@ -51,6 +51,8 @@ var (
 	sqliteDriverName = "sqlite3"
 )
 
+var finishedCompetitionResult  map[string]SuccessResult
+
 // 環境変数を取得する、なければデフォルト値を返す
 func getEnv(key string, defaultValue string) string {
 	if val, ok := os.LookupEnv(key); ok {
@@ -139,6 +141,8 @@ func Run() {
 	e.Debug = true
 	e.Logger.SetLevel(log.DEBUG)
 
+	finishedCompetitionResult = make(map[string]SuccessResult)
+
 	var (
 		sqlLogger io.Closer
 		err       error
@@ -223,7 +227,6 @@ func Run() {
 	serverPort := fmt.Sprintf(":%s", port)
 	e.Logger.Fatal(e.Start(serverPort))
 
-	finishedCompetitionResult = map[string]SuccessResult{}
 }
 
 // エラー処理関数
@@ -1486,8 +1489,6 @@ type PlayerAndPlayerScore struct {
 	PlayerScoreRow	`json:"player_score"`
 }
 
-var finishedCompetitionResult  map[string]SuccessResult
-
 // 参加者向けAPI
 // GET /api/player/competition/:competition_id/ranking
 // 大会ごとのランキングを取得する
@@ -1524,6 +1525,8 @@ func competitionRankingHandler(c echo.Context) error {
 		}
 		return fmt.Errorf("error retrieveCompetition: %w", err)
 	}
+	c.Logger().Info(finishedCompetitionResult)
+
 	result, foundResult := finishedCompetitionResult[competition.ID]
 	if foundResult {
 		return c.JSON(http.StatusOK, result)
